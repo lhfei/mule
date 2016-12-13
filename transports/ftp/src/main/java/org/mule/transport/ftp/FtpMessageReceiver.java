@@ -15,10 +15,12 @@ import org.mule.api.execution.ExecutionCallback;
 import org.mule.api.execution.ExecutionTemplate;
 import org.mule.api.lifecycle.CreateException;
 import org.mule.api.lifecycle.InitialisationException;
+import org.mule.api.retry.RetryCallback;
 import org.mule.api.retry.RetryContext;
 import org.mule.api.transport.Connector;
 import org.mule.construct.Flow;
 import org.mule.processor.strategy.SynchronousProcessingStrategy;
+import org.mule.retry.RetryPolicyExhaustedException;
 import org.mule.transport.AbstractConnector;
 import org.mule.transport.AbstractPollingMessageReceiver;
 import org.mule.transport.ConnectException;
@@ -124,11 +126,40 @@ public class FtpMessageReceiver extends AbstractPollingMessageReceiver
 
     protected FTPFile[] listFiles() throws Exception
     {
-        FTPClient client = null;
+        final FTPClient[] client = {null};
+        RetryCallback callbackReconnection = new RetryCallback()
+        {
+
+            @Override
+            public void doWork(RetryContext context) throws Exception
+            {
+                client[0] = connector.createFtpClient(endpoint);
+            }
+
+            @Override
+            public String getWorkDescription()
+            {
+                return getConnectionDescription();
+            }
+
+            @Override
+            public Connector getWorkOwner()
+            {
+                return connector;
+            }
+        };
         try
         {
-            client = connector.createFtpClient(endpoint);
-            FTPListParseEngine engine = client.initiateListParsing();
+            retryTemplate.execute(callbackReconnection, this.connector.getMuleContext().getWorkManager());
+        }
+        catch (RetryPolicyExhaustedException retryPolicyExhaustedException)
+        {
+            throw new ConnectException(retryPolicyExhaustedException,this.connector);
+        }
+
+        try
+        {
+            FTPListParseEngine engine = client[0].initiateListParsing();
             FTPFile[] files = null;
             List<FTPFile> v = new ArrayList<FTPFile>();
             while (engine.hasNext())
@@ -154,9 +185,9 @@ public class FtpMessageReceiver extends AbstractPollingMessageReceiver
                 }
             }
 
-            if (!FTPReply.isPositiveCompletion(client.getReplyCode()))
+            if (!FTPReply.isPositiveCompletion(client[0].getReplyCode()))
             {
-                throw new IOException("Failed to list files. Ftp error: " + client.getReplyCode());
+                throw new IOException("Failed to list files. Ftp error: " + client[0].getReplyCode());
             }
 
             return v.toArray(new FTPFile[v.size()]);
@@ -169,7 +200,7 @@ public class FtpMessageReceiver extends AbstractPollingMessageReceiver
         {
             if (client != null)
             {
-                connector.releaseFtp(endpoint.getEndpointURI(), client);
+                connector.releaseFtp(endpoint.getEndpointURI(), client[0]);
             }
         }
     }

@@ -84,7 +84,7 @@ public class SimpleRetryPolicy implements RetryPolicy
     protected boolean isExhausted()
     {
         return count != SimpleRetryPolicyTemplate.RETRY_COUNT_FOREVER
-               && retryCounter.current().get() >= count;
+               && retryCounter.current().get() >= count -1;
     }
 
     protected static class RetryCounter extends ThreadLocal<AtomicInteger>
