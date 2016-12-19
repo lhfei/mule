@@ -115,10 +115,10 @@ public class WscClient {
                                                    List<Attachment> attachments) {
     Map<String, Object> props = new HashMap<>();
 
-    // If is NOT MTOM the attachments must not be touched by cxf, we create a custom request embedding the attachment in the xml.
-    if (!mtomEnabled) {
+    if (mtomEnabled) {
       props.put(MULE_ATTACHMENTS_KEY, attachments);
     } else {
+      // is NOT mtom the attachments must not be touched by cxf, we create a custom request embedding the attachment in the xml
       props.put(MULE_ATTACHMENTS_KEY, emptyList());
     }
 
