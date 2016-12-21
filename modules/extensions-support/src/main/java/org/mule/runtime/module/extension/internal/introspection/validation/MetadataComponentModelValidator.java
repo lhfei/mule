@@ -15,6 +15,7 @@ import static org.mule.metadata.internal.utils.MetadataTypeUtils.isVoid;
 import static org.mule.metadata.java.api.utils.JavaTypeUtils.getType;
 import static org.mule.runtime.core.util.StringUtils.isBlank;
 import static org.mule.runtime.extension.api.metadata.NullMetadataResolver.NULL_CATEGORY_NAME;
+import static org.mule.runtime.extension.api.metadata.NullMetadataResolver.NULL_RESOLVER_NAME;
 import static org.mule.runtime.module.extension.internal.util.ExtensionMetadataTypeUtils.getId;
 import static org.mule.runtime.module.extension.internal.util.IntrospectionUtils.getComponentModelTypeName;
 import static org.mule.runtime.module.extension.internal.util.MuleExtensionUtils.getMetadataResolverFactory;
@@ -41,8 +42,11 @@ import org.mule.runtime.extension.api.metadata.NullMetadataResolver;
 import org.mule.runtime.extension.api.model.property.MetadataKeyIdModelProperty;
 import org.mule.runtime.extension.api.model.property.MetadataKeyPartModelProperty;
 
+import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Table;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -56,11 +60,15 @@ import java.util.Set;
  */
 public class MetadataComponentModelValidator implements ModelValidator {
 
+  public static final String EMPTY_RESOLVER_NAME = "%s '%s' specifies a metadata resolver [%s] which has an empty %s name";
+
   @Override
   public void validate(ExtensionModel extensionModel) throws IllegalModelDefinitionException {
     if (!(extensionModel instanceof ExtensionModel)) {
       return;
     }
+
+    final Table<String, String, Class<?>> names = HashBasedTable.create();
     new ExtensionWalker() {
 
       @Override
@@ -79,8 +87,39 @@ public class MetadataComponentModelValidator implements ModelValidator {
         validateMetadataOutputAttributes(model, resolverFactory);
         validateMetadataKeyId(model, resolverFactory);
         validateCategoriesInScope(model, resolverFactory);
+        validateResolversName(model, resolverFactory, names);
       }
     }.walk(extensionModel);
+  }
+
+  private void validateResolversName(ComponentModel model, MetadataResolverFactory resolverFactory,
+                                     Table<String, String, Class<?>> names) {
+    List<NamedTypeResolver> resolvers = new LinkedList<>();
+    resolvers.addAll(getAllInputResolvers(model, resolverFactory));
+    resolvers.add(resolverFactory.getOutputResolver());
+
+    resolvers.stream()
+        .filter(r -> !NULL_RESOLVER_NAME.equals(r.getResolverName()))
+        .forEach(r -> {
+
+          if (isBlank(r.getResolverName())) {
+            throw new IllegalModelDefinitionException(
+                                                      format(EMPTY_RESOLVER_NAME,
+                                                             getComponentModelTypeName(model), model.getName(),
+                                                             r.getClass().getSimpleName(), "resolver"));
+          }
+
+          if (names.get(r.getCategoryName(), r.getResolverName()) != null
+              && names.get(r.getCategoryName(), r.getResolverName()) != r.getClass()) {
+            throw new IllegalModelDefinitionException(format("%s [%s] specifies metadata resolvers with repeated name [%s] for the same category [%s]. Resolver names should be unique for a given category. Affected resolvers are '%s' and '%s'",
+                                                             getComponentModelTypeName(model), model.getName(),
+                                                             r.getResolverName(), r.getCategoryName(),
+                                                             names.get(r.getCategoryName(), r.getResolverName()).getSimpleName(),
+                                                             r.getClass().getSimpleName()));
+
+          }
+          names.put(r.getCategoryName(), r.getResolverName(), r.getClass());
+        });
   }
 
   private void validateMetadataKeyId(ComponentModel model, MetadataResolverFactory resolverFactory) {
@@ -173,9 +212,9 @@ public class MetadataComponentModelValidator implements ModelValidator {
     stream(resolvers).filter(r -> isBlank(r.getCategoryName()))
         .findFirst().ifPresent(r -> {
           throw new IllegalModelDefinitionException(
-                                                    format("%s '%s' specifies a metadata resolver [%s] which has an empty category name",
+                                                    format(EMPTY_RESOLVER_NAME,
                                                            getComponentModelTypeName(componentModel), componentModel.getName(),
-                                                           r.getClass().getSimpleName()));
+                                                           r.getClass().getSimpleName(), "category"));
         });
 
     Set<String> names = stream(resolvers)
