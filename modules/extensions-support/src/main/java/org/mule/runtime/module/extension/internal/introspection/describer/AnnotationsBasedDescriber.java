@@ -62,6 +62,7 @@ import org.mule.runtime.api.meta.model.declaration.fluent.ParameterGroupDeclarer
 import org.mule.runtime.api.meta.model.declaration.fluent.ParameterizedDeclarer;
 import org.mule.runtime.api.meta.model.declaration.fluent.SourceDeclarer;
 import org.mule.runtime.api.meta.model.display.LayoutModel;
+import org.mule.runtime.api.metadata.TypedValue;
 import org.mule.runtime.core.util.ArrayUtils;
 import org.mule.runtime.core.util.CollectionUtils;
 import org.mule.runtime.extension.api.annotation.Configuration;
@@ -97,13 +98,14 @@ import org.mule.runtime.extension.api.manifest.DescriberManifest;
 import org.mule.runtime.extension.api.model.property.ConnectivityModelProperty;
 import org.mule.runtime.extension.api.model.property.PagedOperationModelProperty;
 import org.mule.runtime.extension.api.runtime.operation.InterceptingCallback;
+import org.mule.runtime.extension.api.runtime.operation.ParameterResolver;
 import org.mule.runtime.extension.api.runtime.process.CompletionCallback;
 import org.mule.runtime.extension.api.runtime.streaming.PagingProvider;
 import org.mule.runtime.module.extension.internal.introspection.ParameterGroupDescriptor;
 import org.mule.runtime.module.extension.internal.introspection.describer.contributor.FunctionParameterTypeContributor;
 import org.mule.runtime.module.extension.internal.introspection.describer.contributor.InfrastructureFieldContributor;
 import org.mule.runtime.module.extension.internal.introspection.describer.contributor.ParameterDeclarerContributor;
-import org.mule.runtime.module.extension.internal.introspection.describer.contributor.ParameterResolverParameterTypeContributor;
+import org.mule.runtime.module.extension.internal.introspection.describer.contributor.ParameterTypeUnwrapperContributor;
 import org.mule.runtime.module.extension.internal.introspection.describer.model.ComponentElement;
 import org.mule.runtime.module.extension.internal.introspection.describer.model.ConfigurationElement;
 import org.mule.runtime.module.extension.internal.introspection.describer.model.ConnectionProviderElement;
@@ -203,8 +205,9 @@ public final class AnnotationsBasedDescriber implements Describer {
 
     fieldParameterContributors =
         ImmutableList.of(new InfrastructureFieldContributor(), new FunctionParameterTypeContributor(typeLoader));
-    methodParameterContributors = ImmutableList.of(new ParameterResolverParameterTypeContributor(typeLoader),
-                                                   new FunctionParameterTypeContributor(typeLoader));
+    methodParameterContributors = ImmutableList.of(new ParameterTypeUnwrapperContributor(typeLoader, ParameterResolver.class),
+                                                   new FunctionParameterTypeContributor(typeLoader),
+                                                   new ParameterTypeUnwrapperContributor(typeLoader, TypedValue.class));
   }
 
   /**

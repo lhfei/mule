@@ -8,21 +8,21 @@ package org.mule.runtime.module.extension.internal.runtime.resolver;
 
 import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.api.util.Preconditions.checkArgument;
+import static org.mule.runtime.core.util.ClassUtils.isInstance;
+import org.apache.commons.lang.StringUtils;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.metadata.DataType;
+import org.mule.runtime.api.metadata.TypedValue;
 import org.mule.runtime.core.api.Event;
 import org.mule.runtime.core.api.MuleContext;
+import org.mule.runtime.core.api.el.ExtendedExpressionManager;
 import org.mule.runtime.core.api.transformer.MessageTransformer;
+import org.mule.runtime.core.api.transformer.MessageTransformerException;
 import org.mule.runtime.core.api.transformer.Transformer;
 import org.mule.runtime.core.api.transformer.TransformerException;
 import org.mule.runtime.core.exception.MessagingException;
 import org.mule.runtime.core.util.AttributeEvaluator;
 import org.mule.runtime.core.util.ClassUtils;
-
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-
-import org.apache.commons.lang.StringUtils;
 
 /**
  * A {@link ValueResolver} which evaluates a MEL expressions and tries to ensure that the output is always of a certain type.
@@ -38,23 +38,23 @@ import org.apache.commons.lang.StringUtils;
  */
 public class TypeSafeExpressionValueResolver<T> implements ValueResolver<T> {
 
-  private final Class<?> expectedType;
-  private final AttributeEvaluator evaluator;
+  final AttributeEvaluator evaluator;
+  private final Class<?> expectedClass;
   private final MuleContext muleContext;
-
+  private final DataType expectedDataType;
   private boolean evaluatorInitted = false;
 
   public TypeSafeExpressionValueResolver(String expression, Class<?> expectedType, MuleContext muleContext) {
     checkArgument(!StringUtils.isBlank(expression), "Expression cannot be blank or null");
     checkArgument(expectedType != null, "expected type cannot be null");
 
-    this.expectedType = expectedType;
-    evaluator = new AttributeEvaluator(expression);
-
+    this.expectedClass = expectedType;
+    this.expectedDataType = DataType.fromType(expectedType);
+    this.evaluator = new AttributeEvaluator(expression);
     this.muleContext = muleContext;
   }
 
-  protected void initEvaluator(MuleContext muleContext) {
+  void initEvaluator(MuleContext muleContext) {
     if (!evaluatorInitted) {
       evaluatorInitted = true;
       evaluator.initialize(muleContext.getExpressionManager());
@@ -64,42 +64,13 @@ public class TypeSafeExpressionValueResolver<T> implements ValueResolver<T> {
   @Override
   public T resolve(Event event) throws MuleException {
     initEvaluator(muleContext);
-    T evaluated = (T) evaluator.resolveValue(event);
-    return evaluated != null ? transform(evaluated, event) : null;
-  }
+    TypedValue typedValue = evaluator.resolveTypedValue(event, Event.builder(event));
 
-  private T transform(T object, Event event) throws MuleException {
-    initEvaluator(muleContext);
-    if (ClassUtils.isInstance(expectedType, object)) {
-      return object;
+    if (isInstance(expectedClass, typedValue.getValue())) {
+      return (T) typedValue.getValue();
     }
 
-    Type expectedClass = expectedType;
-    if (expectedClass instanceof ParameterizedType) {
-      expectedClass = ((ParameterizedType) expectedClass).getRawType();
-    }
-
-    DataType sourceDataType = DataType.fromType(object.getClass());
-    DataType targetDataType = DataType.fromType((Class<T>) expectedClass);
-
-    Transformer transformer;
-    try {
-      transformer = muleContext.getRegistry().lookupTransformer(sourceDataType, targetDataType);
-    } catch (TransformerException e) {
-
-      throw new MessagingException(createStaticMessage(String.format(
-                                                                     "Expression '%s' was expected to return a value of type '%s' but a '%s' was found instead "
-                                                                         + "and no suitable transformer could be located",
-                                                                     evaluator.getRawValue(), expectedType.getName(),
-                                                                     object.getClass().getName())),
-                                   event, e);
-    }
-
-    if (transformer instanceof MessageTransformer) {
-      return (T) ((MessageTransformer) transformer).transform(object, event);
-    } else {
-      return (T) transformer.transform(object);
-    }
+    return typedValue.getValue() != null ? (T) transform(typedValue, expectedDataType, event) : null;
   }
 
   /**
@@ -110,9 +81,26 @@ public class TypeSafeExpressionValueResolver<T> implements ValueResolver<T> {
     return true;
   }
 
-  private interface EvaluatorDelegate {
+  public Object transform(TypedValue value, DataType expectedDataType, Event event)
+      throws MessagingException, MessageTransformerException, TransformerException {
+    Transformer transformer;
+    try {
+      transformer = muleContext.getRegistry().lookupTransformer(value.getDataType(), expectedDataType);
+    } catch (TransformerException e) {
+      throw new MessagingException(createStaticMessage(String.format(
+                                                                     "Expression '%s' was expected to return a value of type '%s' but a '%s' was found instead "
+                                                                         + "and no suitable transformer could be located",
+                                                                     evaluator.getRawValue(), expectedClass.getName(),
+                                                                     value.getValue().getClass().getName())),
+                                   event, e);
+    }
 
-    Object resolveValue(Event event);
+    T result;
+    if (transformer instanceof MessageTransformer) {
+      result = (T) ((MessageTransformer) transformer).transform(value.getValue(), event);
+    } else {
+      result = (T) transformer.transform(value.getValue());
+    }
+    return result;
   }
-
 }

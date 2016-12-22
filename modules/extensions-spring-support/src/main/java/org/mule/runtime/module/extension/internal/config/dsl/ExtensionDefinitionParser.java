@@ -40,6 +40,7 @@ import org.mule.runtime.api.meta.ExpressionSupport;
 import org.mule.runtime.api.meta.model.ExtensionModel;
 import org.mule.runtime.api.meta.model.ModelProperty;
 import org.mule.runtime.api.meta.model.parameter.ParameterModel;
+import org.mule.runtime.api.metadata.TypedValue;
 import org.mule.runtime.api.tls.TlsContextFactory;
 import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.api.NestedProcessor;
@@ -53,6 +54,7 @@ import org.mule.runtime.dsl.api.component.ComponentBuildingDefinition;
 import org.mule.runtime.dsl.api.component.ComponentBuildingDefinition.Builder;
 import org.mule.runtime.dsl.api.component.KeyAttributeDefinitionPair;
 import org.mule.runtime.dsl.api.component.TypeConverter;
+import org.mule.runtime.extension.api.runtime.operation.ParameterResolver;
 import org.mule.runtime.extension.xml.dsl.api.DslElementSyntax;
 import org.mule.runtime.extension.xml.dsl.api.resolver.DslSyntaxResolver;
 import org.mule.runtime.module.extension.internal.config.dsl.object.CharsetValueResolverParsingDelegate;
@@ -67,10 +69,11 @@ import org.mule.runtime.module.extension.internal.config.dsl.parameter.ObjectTyp
 import org.mule.runtime.module.extension.internal.config.dsl.parameter.TopLevelParameterObjectFactory;
 import org.mule.metadata.api.visitor.BasicTypeMetadataVisitor;
 import org.mule.runtime.module.extension.internal.introspection.describer.FunctionParameterTypeModelProperty;
-import org.mule.runtime.module.extension.internal.introspection.describer.ParameterResolverTypeModelProperty;
+import org.mule.runtime.module.extension.internal.introspection.describer.ChangedTypeModelProperty;
 import org.mule.runtime.module.extension.internal.model.property.QueryParameterModelProperty;
 import org.mule.runtime.module.extension.internal.runtime.resolver.ExpressionBasedParameterResolverValueResolver;
 import org.mule.runtime.module.extension.internal.runtime.resolver.ExpressionFunctionValueResolver;
+import org.mule.runtime.module.extension.internal.runtime.resolver.ExpressionTypedValueValueResolver;
 import org.mule.runtime.module.extension.internal.runtime.resolver.NativeQueryParameterValueResolver;
 import org.mule.runtime.module.extension.internal.runtime.resolver.NestedProcessorListValueResolver;
 import org.mule.runtime.module.extension.internal.runtime.resolver.NestedProcessorValueResolver;
@@ -498,17 +501,15 @@ public abstract class ExtensionDefinitionParser {
 
     ValueResolver resolver = null;
 
-    if (isExpressionFunction(modelProperties) && value != null) {
-      resolver =
-          new ExpressionFunctionValueResolver<>((String) value, expectedType, muleContext);
-    }
-    if (isExpressionResolver(modelProperties) && value != null) {
-      resolver =
-          new ExpressionBasedParameterResolverValueResolver<>((String) value, expectedType, muleContext);
-    }
-
     final Class<Object> expectedClass = getType(expectedType);
-    if (resolver == null) {
+
+    if (isExpressionFunction(modelProperties) && value != null) {
+      resolver = new ExpressionFunctionValueResolver<>((String) value, expectedType, muleContext);
+    } else if (isParameterResolver(modelProperties, expectedClass) && value != null) {
+      resolver = new ExpressionBasedParameterResolverValueResolver<>((String) value, expectedType, muleContext);
+    } else if (isTypedValue(modelProperties, expectedClass)) {
+      resolver = new ExpressionTypedValueValueResolver((String) value, expectedClass, muleContext);
+    } else {
       if (isExpression(value, parser)) {
         resolver = new TypeSafeExpressionValueResolver((String) value, expectedClass, muleContext);
       }
@@ -761,13 +762,31 @@ public abstract class ExtensionDefinitionParser {
   }
 
   private boolean isExpressionFunction(Set<ModelProperty> modelProperties) {
-    return modelProperties.stream().anyMatch(property -> property instanceof FunctionParameterTypeModelProperty);
-  }
-
-  private boolean isExpressionResolver(Set<ModelProperty> modelProperties) {
     return modelProperties
         .stream()
-        .anyMatch(property -> property instanceof ParameterResolverTypeModelProperty);
+        .anyMatch(property -> property instanceof FunctionParameterTypeModelProperty);
+  }
+
+  private boolean hasChangedType(Class oldType, Set<ModelProperty> modelProperties, Class expectedClass) {
+    return modelProperties
+        .stream()
+        .anyMatch(property -> {
+          if (property instanceof ChangedTypeModelProperty) {
+            ChangedTypeModelProperty modelProperty = (ChangedTypeModelProperty) property;
+            return modelProperty.getOriginalClass().equals(oldType)
+                && modelProperty.getNewClass().equals(expectedClass);
+          } else {
+            return false;
+          }
+        });
+  }
+
+  private boolean isParameterResolver(Set<ModelProperty> modelProperties, Class<Object> expectedClass) {
+    return hasChangedType(ParameterResolver.class, modelProperties, expectedClass);
+  }
+
+  private boolean isTypedValue(Set<ModelProperty> modelProperties, Class<Object> expectedClass) {
+    return hasChangedType(TypedValue.class, modelProperties, expectedClass);
   }
 
   private ValueResolver doParseDate(Object value, Class<?> type) {

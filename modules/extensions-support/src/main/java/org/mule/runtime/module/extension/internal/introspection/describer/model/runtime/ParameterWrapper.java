@@ -15,6 +15,7 @@ import org.mule.runtime.module.extension.internal.introspection.describer.model.
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.Type;
 import java.util.Optional;
 
 import org.springframework.core.ResolvableType;
@@ -56,14 +57,6 @@ public final class ParameterWrapper implements ParameterElement {
    * {@inheritDoc}
    */
   @Override
-  public MetadataType getMetadataType(ClassTypeLoader typeLoader) {
-    return typeLoader.load(ResolvableType.forMethodParameter(owner, index).getType());
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
   public Annotation[] getAnnotations() {
     return parameter.getAnnotations();
   }
@@ -90,5 +83,13 @@ public final class ParameterWrapper implements ParameterElement {
   @Override
   public String getOwnerDescription() {
     return format("Method: '%s'", owner.getName());
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public Type getJavaType() {
+    return ResolvableType.forMethodParameter(owner, index).getType();
   }
 }

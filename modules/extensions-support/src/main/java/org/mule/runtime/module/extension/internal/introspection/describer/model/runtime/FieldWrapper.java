@@ -76,8 +76,8 @@ public class FieldWrapper implements FieldElement {
    * {@inheritDoc}
    */
   @Override
-  public MetadataType getMetadataType(ClassTypeLoader typeLoader) {
-    return typeLoader.load(ResolvableType.forField(field).getType());
+  public java.lang.reflect.Type getJavaType() {
+    return ResolvableType.forField(field).getType();
   }
 
   /**
