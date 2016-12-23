@@ -8,7 +8,6 @@ package org.mule.runtime.module.extension.internal.runtime.exception;
 
 import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.module.extension.internal.util.MuleExtensionUtils.getExtensionsErrorNamespace;
-
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.message.ErrorType;
 import org.mule.runtime.api.meta.model.ComponentModel;
@@ -18,10 +17,9 @@ import org.mule.runtime.core.exception.ErrorTypeRepository;
 import org.mule.runtime.core.exception.TypedException;
 import org.mule.runtime.dsl.api.component.ComponentIdentifier;
 import org.mule.runtime.extension.api.error.ErrorTypeDefinition;
+import org.mule.runtime.extension.api.error.HasErrorType;
 import org.mule.runtime.extension.api.exception.ModuleException;
 
-import java.util.HashMap;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -65,8 +63,8 @@ public class ModuleExceptionHandler {
    * @param throwable to process
    */
   public Throwable processException(Throwable throwable) {
-    if (throwable instanceof ModuleException) {
-      ErrorTypeDefinition errorDefinition = ((ModuleException) throwable).getType();
+    if (throwable instanceof HasErrorType) {
+      ErrorTypeDefinition errorDefinition = ((HasErrorType) throwable).getType();
       return handleTypedException(throwable, errorDefinition);
     }
     return throwable;
@@ -89,7 +87,8 @@ public class ModuleExceptionHandler {
                                                                         extensionNamespace + ":" + errorDefinition),
                                                     exception.getCause()));
 
-    return new TypedException(exception.getCause(), errorType);
+    return exception instanceof ModuleException ? new TypedException(exception.getCause(), errorType)
+        : new TypedException(exception, errorType);
   }
 
 

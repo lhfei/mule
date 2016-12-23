@@ -16,11 +16,11 @@ import static org.junit.Assert.assertThat;
 import static org.mule.extension.file.common.api.FileWriteMode.APPEND;
 import static org.mule.extension.file.common.api.FileWriteMode.CREATE_NEW;
 import static org.mule.extension.file.common.api.FileWriteMode.OVERWRITE;
-
-import org.mule.runtime.core.api.Event;
-import org.mule.runtime.api.exception.MuleRuntimeException;
-import org.mule.runtime.core.util.FileUtils;
 import org.mule.extension.file.common.api.FileWriteMode;
+import org.mule.extension.file.common.api.exceptions.IllegalPathException;
+import org.mule.runtime.api.exception.MuleRuntimeException;
+import org.mule.runtime.core.api.Event;
+import org.mule.runtime.core.util.FileUtils;
 
 import java.io.File;
 import java.util.Arrays;
@@ -71,7 +71,7 @@ public class FileWriteTestCase extends FileConnectorTestCase {
 
   @Test
   public void appendOnNotExistingParentWithoutCreateFolder() throws Exception {
-    expectedException.expectCause(instanceOf(IllegalArgumentException.class));
+    expectedException.expectCause(instanceOf(IllegalPathException.class));
     doWriteOnNotExistingParentWithoutCreateFolder(APPEND);
   }
 
@@ -83,7 +83,7 @@ public class FileWriteTestCase extends FileConnectorTestCase {
 
   @Test
   public void createNewOnNotExistingParentWithoutCreateFolder() throws Exception {
-    expectedException.expectCause(instanceOf(IllegalArgumentException.class));
+    expectedException.expectCause(instanceOf(IllegalPathException.class));
     doWriteOnNotExistingParentWithoutCreateFolder(CREATE_NEW);
   }
 
