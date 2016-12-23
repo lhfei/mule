@@ -24,4 +24,9 @@ public interface WscDispatcher {
    * @return a {@link WscResponse} with the content returned by the transport and it's corresponding Content-Type.
    */
   WscResponse dispatch(Message message);
+
+  /**
+   * Disposes all the associated resources to this {@link WscDispatcher} instance.
+   */
+  void dispose();
 }

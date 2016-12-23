@@ -93,6 +93,7 @@ public class WscClient {
 
   public void destroy() {
     cxfClient.destroy();
+    dispatcher.dispose();
   }
 
   private BindingOperationInfo getInvocationOperation() throws Exception {

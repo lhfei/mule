@@ -72,6 +72,14 @@ public final class HttpDispatcher implements WscDispatcher {
     }
   }
 
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void dispose() {
+    client.stop();
+  }
+
   private ParameterMap buildHeaders(Message message) {
     ParameterMap headers = new ParameterMap();
     headers.put(CONTENT_TYPE, (String) message.get(CONTENT_TYPE));
