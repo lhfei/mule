@@ -164,6 +164,20 @@ final class ClientFactory {
   }
 
   private WscDispatcher createDispatcher(String address, HttpService httpService, String transportConfig) {
+    //try {
+    //  URL addressUrl = new URL(address);
+    //  String protocol = addressUrl.getProtocol();
+    //  if (transportConfig == null) {
+    //    if (protocol.equals("http")) {
     return HttpDispatcher.createDefault(address, httpService);
+    //    }
+    //    throw new ConnectionException(format("Cannot create a default dispatcher for the [%s] protocol", protocol));
+    //  }
+    //  // TODO: MULE-10783: use custom transport configuration
+    //  throw new UnsupportedOperationException("cannot create a dispatcher for the given configuration");
+    //} catch (MalformedURLException e) {
+    //  throw new ConnectionException(format("The provided address [%s] is not a valid URL", address), e);
+    //}
+
   }
 }
