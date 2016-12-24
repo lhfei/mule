@@ -2971,7 +2971,7 @@ public class DeploymentServiceTestCase extends AbstractMuleTestCase {
 
 
     policyManager.addPolicy(applicationFileBuilder.getId(), policyFileBuilder.getId(),
-                            new PolicyParametrization(TEST_POLICY_ID, pointcut, new HashedMap()));
+                            new PolicyParametrization(TEST_POLICY_ID, pointcut, 1, new HashedMap()));
     startDeployment();
 
     assertApplicationDeploymentSuccess(applicationDeploymentListener, applicationFileBuilder.getId());
@@ -2988,7 +2988,7 @@ public class DeploymentServiceTestCase extends AbstractMuleTestCase {
     addPackedAppFromBuilder(applicationFileBuilder);
 
     policyManager.addPolicy(applicationFileBuilder.getId(), policyFileBuilder.getId(),
-                            new PolicyParametrization(TEST_POLICY_ID, parameters -> true, new HashedMap()));
+                            new PolicyParametrization(TEST_POLICY_ID, parameters -> true, 1, new HashedMap()));
 
     startDeployment();
 
